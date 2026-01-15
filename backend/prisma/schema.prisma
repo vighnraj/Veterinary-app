@@ -1,0 +1,939 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== AUTHENTICATION & ACCOUNTS ====================
+
+model Account {
+  id                    String    @id @default(uuid())
+  name                  String
+  email                 String    @unique
+  phone                 String?
+  document              String?   // CPF/CNPJ
+  documentType          String?   // CPF or CNPJ
+  address               String?   @db.Text
+  city                  String?
+  state                 String?
+  zipCode               String?
+  country               String    @default("BR")
+  logoUrl               String?
+
+  // Subscription
+  stripeCustomerId      String?   @unique
+  subscriptionId        String?
+  subscriptionStatus    String    @default("trialing") // trialing, active, past_due, canceled, unpaid
+  planId                String?
+  plan                  Plan?     @relation(fields: [planId], references: [id])
+  trialEndsAt           DateTime?
+  subscriptionEndsAt    DateTime?
+
+  // Settings
+  timezone              String    @default("America/Sao_Paulo")
+  currency              String    @default("BRL")
+  dateFormat            String    @default("DD/MM/YYYY")
+
+  // Fiscal
+  fiscalEnabled         Boolean   @default(false)
+  fiscalCertificate     String?   @db.Text
+  fiscalPassword        String?
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  users                 User[]
+  clients               Client[]
+  animals               Animal[]
+  batches               Batch[]
+  appointments          Appointment[]
+  services              Service[]
+  invoices              Invoice[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  vaccinations          Vaccination[]
+  sanitaryCampaigns     SanitaryCampaign[]
+  reproductiveProcedures ReproductiveProcedure[]
+
+  @@map("accounts")
+}
+
+model Plan {
+  id                    String    @id @default(uuid())
+  name                  String    // Basic, Pro, Enterprise
+  description           String?   @db.Text
+
+  // Pricing
+  priceMonthly          Decimal   @db.Decimal(10, 2)
+  priceYearly           Decimal   @db.Decimal(10, 2)
+  stripePriceMonthly    String?
+  stripePriceYearly     String?
+
+  // Limits
+  maxUsers              Int       @default(1)
+  maxAnimals            Int       @default(100)
+  maxClients            Int       @default(50)
+  maxStorageGB          Int       @default(1)
+
+  // Features
+  features              Json      // Array of feature flags
+
+  isActive              Boolean   @default(true)
+  sortOrder             Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  accounts              Account[]
+
+  @@map("plans")
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  email                 String    @unique
+  password              String
+  firstName             String
+  lastName              String
+  phone                 String?
+  avatarUrl             String?
+
+  role                  String    @default("user") // owner, admin, user, viewer
+  permissions           Json?     // Custom permissions override
+
+  // Verification
+  emailVerified         Boolean   @default(false)
+  emailVerifyToken      String?
+  emailVerifyExpires    DateTime?
+
+  // Password Reset
+  passwordResetToken    String?
+  passwordResetExpires  DateTime?
+
+  // Session
+  refreshToken          String?   @db.Text
+  lastLoginAt           DateTime?
+  lastLoginIp           String?
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  appointments          Appointment[]
+  auditLogs             AuditLog[]
+  createdInvoices       Invoice[] @relation("InvoiceCreator")
+  notifications         Notification[]
+
+  @@index([accountId])
+  @@map("users")
+}
+
+model AuditLog {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId                String?
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action                String    // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity                String    // User, Animal, Appointment, etc.
+  entityId              String?
+  oldData               Json?
+  newData               Json?
+  ipAddress             String?
+  userAgent             String?   @db.Text
+
+  createdAt             DateTime  @default(now())
+
+  @@index([accountId])
+  @@index([userId])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+// ==================== CLIENTS / PRODUCERS ====================
+
+model Client {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  name                  String
+  email                 String?
+  phone                 String?
+  whatsapp              String?
+  document              String?   // CPF/CNPJ
+  documentType          String?   // CPF or CNPJ
+
+  // Address
+  address               String?   @db.Text
+  city                  String?
+  state                 String?
+  zipCode               String?
+  country               String    @default("BR")
+
+  // Additional
+  notes                 String?   @db.Text
+  tags                  Json?     // Array of tags
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  properties            Property[]
+  animals               Animal[]
+  batches               Batch[]
+  appointments          Appointment[]
+  invoices              Invoice[]
+
+  @@index([accountId])
+  @@map("clients")
+}
+
+model Property {
+  id                    String    @id @default(uuid())
+  clientId              String
+  client                Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  name                  String
+  description           String?   @db.Text
+
+  // Location
+  address               String?   @db.Text
+  city                  String?
+  state                 String?
+  zipCode               String?
+  latitude              Decimal?  @db.Decimal(10, 8)
+  longitude             Decimal?  @db.Decimal(11, 8)
+
+  // Size
+  totalAreaHectares     Decimal?  @db.Decimal(10, 2)
+  pastureAreaHectares   Decimal?  @db.Decimal(10, 2)
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  animals               Animal[]
+  batches               Batch[]
+
+  @@index([clientId])
+  @@map("properties")
+}
+
+// ==================== ANIMALS ====================
+
+model Species {
+  id                    String    @id @default(uuid())
+  name                  String    @unique // Bovine, Equine, Caprine, Ovine, Swine
+  nameScientific        String?
+  description           String?   @db.Text
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  breeds                Breed[]
+  animals               Animal[]
+
+  @@map("species")
+}
+
+model Breed {
+  id                    String    @id @default(uuid())
+  speciesId             String
+  species               Species   @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+
+  name                  String
+  description           String?   @db.Text
+  origin                String?
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  animals               Animal[]
+
+  @@unique([speciesId, name])
+  @@map("breeds")
+}
+
+model Animal {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  clientId              String
+  client                Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  propertyId            String?
+  property              Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  batchId               String?
+  batch                 Batch?    @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  // Identification
+  identifier            String    // Ear tag, microchip, etc.
+  name                  String?
+  registrationNumber    String?   // Official registration
+
+  // Classification
+  speciesId             String
+  species               Species   @relation(fields: [speciesId], references: [id])
+  breedId               String?
+  breed                 Breed?    @relation(fields: [breedId], references: [id])
+  crossBreed            String?   // For mixed breeds
+
+  // Physical
+  sex                   String    // male, female
+  coatColor             String?
+  markings              String?   @db.Text
+
+  // Birth & Age
+  dateOfBirth           DateTime?
+  estimatedAge          String?   // If DOB unknown
+  birthWeight           Decimal?  @db.Decimal(10, 2)
+
+  // Current Status
+  currentWeight         Decimal?  @db.Decimal(10, 2)
+  lastWeighingDate      DateTime?
+  bodyConditionScore    Decimal?  @db.Decimal(3, 1) // 1-9 scale
+
+  // Status
+  status                String    @default("active") // active, sold, deceased, transferred
+  statusReason          String?   // Reason for status change
+  statusDate            DateTime?
+
+  // Reproductive Status (for females)
+  reproductiveStatus    String?   // open, pregnant, lactating, dry
+  lastCalvingDate       DateTime?
+  expectedCalvingDate   DateTime?
+  numberOfCalvings      Int       @default(0)
+
+  // Genealogy
+  sireId                String?
+  sire                  Animal?   @relation("Sire", fields: [sireId], references: [id], onDelete: SetNull)
+  damId                 String?
+  dam                   Animal?   @relation("Dam", fields: [damId], references: [id], onDelete: SetNull)
+
+  // Photos
+  photoUrl              String?
+  photos                Json?     // Array of photo URLs
+
+  // Additional
+  notes                 String?   @db.Text
+  tags                  Json?
+  customFields          Json?
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  // Relations
+  offspringSire         Animal[]  @relation("Sire")
+  offspringDam          Animal[]  @relation("Dam")
+
+  weightRecords         WeightRecord[]
+  healthRecords         HealthRecord[]
+  vaccinations          AnimalVaccination[]
+  reproductiveRecords   ReproductiveRecord[]
+  reproductiveProcedures ReproductiveProcedure[]
+  appointmentAnimals    AppointmentAnimal[]
+  invoiceItems          InvoiceItem[]
+
+  @@unique([accountId, identifier])
+  @@index([accountId])
+  @@index([clientId])
+  @@index([propertyId])
+  @@index([batchId])
+  @@index([speciesId])
+  @@index([breedId])
+  @@index([status])
+  @@map("animals")
+}
+
+model Batch {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  clientId              String
+  client                Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  propertyId            String?
+  property              Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  name                  String
+  description           String?   @db.Text
+
+  // Category
+  category              String?   // breeding, fattening, lactating, etc.
+
+  // Stats (denormalized for performance)
+  totalAnimals          Int       @default(0)
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  animals               Animal[]
+  appointmentBatches    AppointmentBatch[]
+
+  @@index([accountId])
+  @@index([clientId])
+  @@map("batches")
+}
+
+model WeightRecord {
+  id                    String    @id @default(uuid())
+  animalId              String
+  animal                Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  weight                Decimal   @db.Decimal(10, 2)
+  unit                  String    @default("kg")
+  date                  DateTime
+  bodyConditionScore    Decimal?  @db.Decimal(3, 1)
+  notes                 String?   @db.Text
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([animalId])
+  @@map("weight_records")
+}
+
+// ==================== SANITARY MANAGEMENT ====================
+
+model Vaccination {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  name                  String
+  description           String?   @db.Text
+  manufacturer          String?
+  targetDiseases        Json?     // Array of diseases
+
+  // Schedule
+  doseIntervalDays      Int?      // Days between doses
+  boosterIntervalDays   Int?      // Days until booster needed
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  animalVaccinations    AnimalVaccination[]
+  campaignVaccinations  CampaignVaccination[]
+
+  @@index([accountId])
+  @@map("vaccinations")
+}
+
+model AnimalVaccination {
+  id                    String    @id @default(uuid())
+  animalId              String
+  animal                Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  vaccinationId         String
+  vaccination           Vaccination @relation(fields: [vaccinationId], references: [id], onDelete: Cascade)
+
+  applicationDate       DateTime
+  doseNumber            Int       @default(1)
+  batchNumber           String?   // Vaccine batch/lot number
+  expirationDate        DateTime?
+  applicationSite       String?   // Neck, rump, etc.
+  applicator            String?   // Who applied
+
+  // Next dose reminder
+  nextDoseDate          DateTime?
+  reminderSent          Boolean   @default(false)
+
+  notes                 String?   @db.Text
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([animalId])
+  @@index([vaccinationId])
+  @@map("animal_vaccinations")
+}
+
+model SanitaryCampaign {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  name                  String
+  description           String?   @db.Text
+  type                  String    // vaccination, deworming, testing
+
+  startDate             DateTime
+  endDate               DateTime?
+
+  status                String    @default("planned") // planned, active, completed, cancelled
+
+  notes                 String?   @db.Text
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  vaccinations          CampaignVaccination[]
+
+  @@index([accountId])
+  @@map("sanitary_campaigns")
+}
+
+model CampaignVaccination {
+  id                    String    @id @default(uuid())
+  campaignId            String
+  campaign              SanitaryCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  vaccinationId         String
+  vaccination           Vaccination @relation(fields: [vaccinationId], references: [id], onDelete: Cascade)
+
+  targetCount           Int?
+  completedCount        Int       @default(0)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([campaignId])
+  @@index([vaccinationId])
+  @@map("campaign_vaccinations")
+}
+
+model HealthRecord {
+  id                    String    @id @default(uuid())
+  animalId              String
+  animal                Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  type                  String    // treatment, deworming, examination, surgery
+  date                  DateTime
+
+  // Diagnosis
+  diagnosis             String?   @db.Text
+  symptoms              Json?     // Array of symptoms
+
+  // Treatment
+  treatment             String?   @db.Text
+  medications           Json?     // Array of medications with dosage
+
+  // Follow-up
+  followUpDate          DateTime?
+  followUpNotes         String?   @db.Text
+
+  // Outcome
+  outcome               String?   // recovered, ongoing, deceased
+
+  veterinarian          String?
+  attachments           Json?     // Array of file URLs
+  notes                 String?   @db.Text
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([animalId])
+  @@map("health_records")
+}
+
+// ==================== REPRODUCTIVE MANAGEMENT ====================
+
+model ReproductiveRecord {
+  id                    String    @id @default(uuid())
+  animalId              String
+  animal                Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  type                  String    // heat, insemination, pregnancy_check, birth, abortion, andrological
+  date                  DateTime
+
+  // Heat Detection
+  heatIntensity         String?   // weak, moderate, strong
+  heatDuration          Int?      // Hours
+
+  // Insemination
+  inseminationType      String?   // artificial, natural, FTAI
+  semenSource           String?   // Bull name/ID or straw info
+  semenBatch            String?
+  inseminationTime      DateTime?
+  inseminator           String?
+
+  // Pregnancy Check
+  pregnancyResult       String?   // positive, negative, uncertain
+  gestationDays         Int?
+  fetalCount            Int?
+  fetalSex              String?   // male, female, unknown
+
+  // Birth
+  birthType             String?   // normal, dystocia, cesarean
+  birthWeight           Decimal?  @db.Decimal(10, 2)
+  offspringId           String?   // Link to newborn animal
+
+  // Andrological (males)
+  spermMotility         Decimal?  @db.Decimal(5, 2)
+  spermConcentration    Decimal?  @db.Decimal(10, 2)
+  spermMorphology       Decimal?  @db.Decimal(5, 2)
+  scrotalCircumference  Decimal?  @db.Decimal(5, 2)
+
+  notes                 String?   @db.Text
+  attachments           Json?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([animalId])
+  @@index([type])
+  @@map("reproductive_records")
+}
+
+model ReproductiveProcedure {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  animalId              String
+  animal                Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  appointmentId         String?
+  appointment           Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  procedureType         String    // AI, FTAI, ET, embryo_collection, pregnancy_diagnosis, natural_breeding
+  date                  DateTime
+
+  // Protocol (for FTAI)
+  protocolName          String?
+  protocolDay           Int?
+  protocolStartDate     DateTime?
+
+  // Semen/Embryo Info
+  semenBullId           String?
+  semenBatch            String?
+  embryoId              String?
+  embryoQuality         String?
+  embryoStage           String?
+
+  // Results
+  result                String?   // success, failed, pending
+  resultDate            DateTime?
+
+  // Embryo Collection specific
+  embryosCollected      Int?
+  embryosViable         Int?
+  embryosFrozen         Int?
+
+  technician            String?
+  notes                 String?   @db.Text
+  attachments           Json?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([accountId])
+  @@index([animalId])
+  @@index([appointmentId])
+  @@map("reproductive_procedures")
+}
+
+// ==================== APPOINTMENTS ====================
+
+model Service {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  name                  String
+  description           String?   @db.Text
+  category              String    // reproductive, sanitary, clinical, surgical, consulting
+
+  // Pricing
+  defaultPrice          Decimal   @db.Decimal(10, 2)
+  priceUnit             String    @default("per_animal") // per_animal, per_batch, fixed, hourly
+
+  // Duration
+  estimatedDurationMinutes Int?
+
+  // Form Template
+  formTemplate          Json?     // Dynamic form fields configuration
+
+  // Requirements
+  requiresAnimal        Boolean   @default(true)
+  requiresBatch         Boolean   @default(false)
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  appointmentServices   AppointmentService[]
+  invoiceItems          InvoiceItem[]
+
+  @@index([accountId])
+  @@map("services")
+}
+
+model Appointment {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  clientId              String
+  client                Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId                String?
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Scheduling
+  scheduledDate         DateTime
+  scheduledEndDate      DateTime?
+  actualStartDate       DateTime?
+  actualEndDate         DateTime?
+
+  // Status
+  status                String    @default("scheduled") // scheduled, confirmed, in_progress, completed, cancelled
+  cancellationReason    String?   @db.Text
+
+  // Location
+  locationType          String    @default("property") // property, clinic, other
+  locationNotes         String?   @db.Text
+
+  // Notes
+  notes                 String?   @db.Text
+  internalNotes         String?   @db.Text
+
+  // Report
+  reportGenerated       Boolean   @default(false)
+  reportUrl             String?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  appointmentAnimals    AppointmentAnimal[]
+  appointmentBatches    AppointmentBatch[]
+  appointmentServices   AppointmentService[]
+  reproductiveProcedures ReproductiveProcedure[]
+  invoices              Invoice[]
+
+  @@index([accountId])
+  @@index([clientId])
+  @@index([userId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@map("appointments")
+}
+
+model AppointmentAnimal {
+  id                    String    @id @default(uuid())
+  appointmentId         String
+  appointment           Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  animalId              String
+  animal                Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  // Per-animal notes and results
+  notes                 String?   @db.Text
+  procedureData         Json?     // Dynamic form data for this animal
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([appointmentId, animalId])
+  @@map("appointment_animals")
+}
+
+model AppointmentBatch {
+  id                    String    @id @default(uuid())
+  appointmentId         String
+  appointment           Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  batchId               String
+  batch                 Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  // Batch-level data
+  animalCount           Int       @default(0)
+  notes                 String?   @db.Text
+  procedureData         Json?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([appointmentId, batchId])
+  @@map("appointment_batches")
+}
+
+model AppointmentService {
+  id                    String    @id @default(uuid())
+  appointmentId         String
+  appointment           Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  serviceId             String
+  service               Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  quantity              Int       @default(1)
+  unitPrice             Decimal   @db.Decimal(10, 2)
+  totalPrice            Decimal   @db.Decimal(10, 2)
+
+  // Service-specific form data
+  formData              Json?
+
+  notes                 String?   @db.Text
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([appointmentId])
+  @@index([serviceId])
+  @@map("appointment_services")
+}
+
+// ==================== FINANCIAL ====================
+
+model Invoice {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  clientId              String
+  client                Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  appointmentId         String?
+  appointment           Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  createdById           String?
+  createdBy             User?     @relation("InvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // Invoice Number
+  invoiceNumber         String
+
+  // Dates
+  issueDate             DateTime  @default(now())
+  dueDate               DateTime
+  paidDate              DateTime?
+
+  // Amounts
+  subtotal              Decimal   @db.Decimal(10, 2)
+  discountPercent       Decimal   @db.Decimal(5, 2) @default(0)
+  discountAmount        Decimal   @db.Decimal(10, 2) @default(0)
+  taxPercent            Decimal   @db.Decimal(5, 2) @default(0)
+  taxAmount             Decimal   @db.Decimal(10, 2) @default(0)
+  totalAmount           Decimal   @db.Decimal(10, 2)
+  paidAmount            Decimal   @db.Decimal(10, 2) @default(0)
+
+  // Status
+  status                String    @default("draft") // draft, sent, paid, partial, overdue, cancelled
+
+  // Payment
+  paymentMethod         String?   // cash, card, pix, bank_transfer, check
+  paymentReference      String?
+
+  // Fiscal
+  fiscalStatus          String?   // pending, authorized, rejected, cancelled
+  fiscalNumber          String?   // NFe number
+  fiscalXml             String?   @db.LongText
+  fiscalPdfUrl          String?
+
+  // Notes
+  notes                 String?   @db.Text
+  internalNotes         String?   @db.Text
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  items                 InvoiceItem[]
+  payments              Payment[]
+
+  @@unique([accountId, invoiceNumber])
+  @@index([accountId])
+  @@index([clientId])
+  @@index([appointmentId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id                    String    @id @default(uuid())
+  invoiceId             String
+  invoice               Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  serviceId             String?
+  service               Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  animalId              String?
+  animal                Animal?   @relation(fields: [animalId], references: [id], onDelete: SetNull)
+
+  description           String
+  quantity              Int       @default(1)
+  unitPrice             Decimal   @db.Decimal(10, 2)
+  discountPercent       Decimal   @db.Decimal(5, 2) @default(0)
+  totalPrice            Decimal   @db.Decimal(10, 2)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model Payment {
+  id                    String    @id @default(uuid())
+  invoiceId             String
+  invoice               Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  amount                Decimal   @db.Decimal(10, 2)
+  paymentDate           DateTime
+  paymentMethod         String    // cash, card, pix, bank_transfer, check
+  reference             String?
+
+  notes                 String?   @db.Text
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id                    String    @id @default(uuid())
+  accountId             String
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId                String?
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type                  String    // appointment_reminder, vaccine_due, payment_due, pregnancy_check, etc.
+  title                 String
+  message               String    @db.Text
+
+  // Related entity
+  relatedEntity         String?   // Animal, Appointment, Invoice, etc.
+  relatedEntityId       String?
+
+  // Delivery
+  channels              Json      // Array: ['push', 'in_app', 'email']
+  pushSent              Boolean   @default(false)
+  emailSent             Boolean   @default(false)
+
+  // Status
+  read                  Boolean   @default(false)
+  readAt                DateTime?
+
+  scheduledFor          DateTime?
+  sentAt                DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([accountId])
+  @@index([userId])
+  @@index([read])
+  @@map("notifications")
+}
+
+model PushToken {
+  id                    String    @id @default(uuid())
+  userId                String
+
+  token                 String    @unique
+  platform              String    // ios, android, web
+  deviceName            String?
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("push_tokens")
+}
