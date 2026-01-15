@@ -4,6 +4,7 @@ module.exports = {
     './app/**/*.{js,jsx}',
     './src/**/*.{js,jsx}',
   ],
+  presets: [require('nativewind/preset')],
   theme: {
     extend: {
       colors: {
