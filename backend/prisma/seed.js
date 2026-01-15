@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcrypt');
 
 const prisma = new PrismaClient();
 
@@ -241,6 +242,38 @@ async function main() {
     }),
   ]);
   console.log(`Created ${equineBreeds.length} equine breeds`);
+
+  // Create Test Account and User
+  const hashedPassword = await bcrypt.hash('Test@123', 12);
+  const trialEndsAt = new Date();
+  trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
+  const testAccount = await prisma.account.upsert({
+    where: { email: 'test@vetsaas.com' },
+    update: {},
+    create: {
+      name: 'Test Veterinary Clinic',
+      email: 'test@vetsaas.com',
+      phone: '(11) 99999-9999',
+      subscriptionStatus: 'trialing',
+      trialEndsAt,
+    },
+  });
+
+  const testUser = await prisma.user.upsert({
+    where: { email: 'test@vetsaas.com' },
+    update: {},
+    create: {
+      accountId: testAccount.id,
+      email: 'test@vetsaas.com',
+      password: hashedPassword,
+      firstName: 'Test',
+      lastName: 'User',
+      role: 'owner',
+      emailVerified: true,
+    },
+  });
+  console.log('Created test user: test@vetsaas.com / Test@123');
 
   console.log('Seeding completed!');
 }
