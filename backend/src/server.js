@@ -19,11 +19,16 @@ app.set('trust proxy', 1);
 
 // Security middlewares
 app.use(helmet());
+
+// CORS - allow all origins
 app.use(cors({
-  origin: config.urls.frontend,
+  origin: function(origin, callback) {
+    // Allow all origins
+    callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 // Rate limiting
