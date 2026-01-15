@@ -20,21 +20,16 @@ app.set('trust proxy', 1);
 // Security middlewares
 app.use(helmet());
 
-// CORS - allow all origins in development
-const corsOptions = config.env === 'development'
-  ? {
-      origin: true, // Allow all origins in development
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    }
-  : {
-      origin: config.urls.frontend,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    };
-app.use(cors(corsOptions));
+// CORS - allow all origins
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow all origins
+    callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
 
 // Rate limiting
 const limiter = rateLimit({
