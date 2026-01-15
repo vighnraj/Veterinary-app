@@ -1,0 +1,12 @@
+export { default as apiClient } from './client';
+export { authApi } from './auth';
+export { dashboardApi } from './dashboard';
+export { clientsApi } from './clients';
+export { animalsApi } from './animals';
+export { appointmentsApi } from './appointments';
+export { reproductiveApi } from './reproductive';
+export { sanitaryApi } from './sanitary';
+export { financialApi } from './financial';
+export { subscriptionApi } from './subscription';
+export { notificationsApi } from './notifications';
+export { reportsApi } from './reports';
