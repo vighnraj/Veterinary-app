@@ -5,10 +5,19 @@ import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../constants/routes';
 import { getInitials } from '../../utils/formatters';
 
+const roleLabels = {
+  owner: { label: 'Owner', color: 'danger' },
+  admin: { label: 'Admin', color: 'warning' },
+  user: { label: 'User', color: 'info' },
+  viewer: { label: 'Viewer', color: 'secondary' },
+};
+
 const Navbar = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
+
+  const userRole = roleLabels[user?.role] || roleLabels.viewer;
 
   const handleLogout = async () => {
     await logout();
@@ -63,6 +72,9 @@ const Navbar = ({ onMenuClick }) => {
               <span className="d-none d-md-block text-dark">
                 {user?.firstName}
               </span>
+              <span className={`badge bg-${userRole.color} d-none d-md-inline`}>
+                {userRole.label}
+              </span>
             </button>
 
             {showDropdown && (
@@ -78,6 +90,9 @@ const Navbar = ({ onMenuClick }) => {
                 >
                   <div className="px-3 py-2 border-bottom">
                     <strong>{user?.firstName} {user?.lastName}</strong>
+                    <span className={`badge bg-${userRole.color} ms-2`}>
+                      {userRole.label}
+                    </span>
                     <br />
                     <small className="text-muted">{user?.email}</small>
                   </div>

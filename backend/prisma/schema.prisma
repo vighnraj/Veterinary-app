@@ -59,6 +59,7 @@ model Account {
   vaccinations          Vaccination[]
   sanitaryCampaigns     SanitaryCampaign[]
   reproductiveProcedures ReproductiveProcedure[]
+  nfeConfig             NFeConfig?
 
   @@map("accounts")
 }
@@ -834,6 +835,7 @@ model Invoice {
 
   items                 InvoiceItem[]
   payments              Payment[]
+  nfeRecords            NFeRecord[]
 
   @@unique([accountId, invoiceNumber])
   @@index([accountId])
@@ -936,4 +938,150 @@ model PushToken {
 
   @@index([userId])
   @@map("push_tokens")
+}
+
+// ==================== TEAM MANAGEMENT ====================
+
+model TeamInvite {
+  id                    String    @id @default(uuid())
+  accountId             String
+  invitedById           String
+
+  email                 String
+  role                  String    @default("assistant") // admin, veterinarian, assistant, receptionist
+  token                 String    @unique
+
+  expiresAt             DateTime
+  acceptedAt            DateTime?
+  acceptedByUserId      String?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([accountId])
+  @@index([token])
+  @@map("team_invites")
+}
+
+model AccountDeletionRequest {
+  id                    String    @id @default(uuid())
+  userId                String
+  accountId             String
+
+  reason                String?   @db.Text
+  requestedAt           DateTime  @default(now())
+  scheduledDeletionAt   DateTime
+  cancelledAt           DateTime?
+  completedAt           DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([accountId])
+  @@map("account_deletion_requests")
+}
+
+// ==================== NFe / SEFAZ ====================
+
+model NFeConfig {
+  id                    String    @id @default(uuid())
+  accountId             String    @unique
+  account               Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Environment
+  environment           String    @default("homologacao") // homologacao, producao
+
+  // Company Info (for NFe)
+  cnpj                  String?
+  inscricaoEstadual     String?
+  inscricaoMunicipal    String?
+  razaoSocial           String?
+  nomeFantasia          String?
+
+  // Address
+  logradouro            String?
+  numero                String?
+  bairro                String?
+  codigoMunicipio       String?
+  municipio             String?
+  uf                    String?
+  cep                   String?
+
+  // NFe Series and Number
+  serieNFe              Int       @default(1)
+  ultimoNumeroNFe       Int       @default(0)
+  serieNFSe             Int       @default(1)
+  ultimoNumeroNFSe      Int       @default(0)
+
+  // Certificate
+  certificateData       Bytes?
+  certificatePassword   String?
+  certificateExpiry     DateTime?
+
+  // Tax Settings
+  regimeTributario      String?   // simples_nacional, lucro_presumido, lucro_real
+  codigoCnae            String?
+  itemListaServico      String?   // For NFS-e
+  aliquotaIss           Decimal?  @db.Decimal(5, 2)
+
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  nfeRecords            NFeRecord[]
+
+  @@map("nfe_configs")
+}
+
+model NFeRecord {
+  id                    String    @id @default(uuid())
+  nfeConfigId           String
+  nfeConfig             NFeConfig @relation(fields: [nfeConfigId], references: [id], onDelete: Cascade)
+  invoiceId             String
+  invoice               Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  // NFe Type
+  tipo                  String    @default("NFe") // NFe, NFSe, NFCe
+
+  // NFe Identification
+  numero                Int
+  serie                 Int
+  chaveAcesso           String?   @unique
+
+  // Status
+  status                String    @default("pending") // pending, processing, authorized, rejected, cancelled
+  codigoStatus          String?
+  motivoStatus          String?   @db.Text
+
+  // Protocol
+  protocolo             String?
+  dataAutorizacao       DateTime?
+
+  // XML
+  xmlEnvio              String?   @db.LongText
+  xmlRetorno            String?   @db.LongText
+  xmlCancelamento       String?   @db.LongText
+
+  // PDF
+  pdfUrl                String?
+
+  // Cancellation
+  cancelada             Boolean   @default(false)
+  dataCancelamento      DateTime?
+  motivoCancelamento    String?   @db.Text
+  protocoloCancelamento String?
+
+  // Retry Info
+  tentativas            Int       @default(0)
+  ultimaTentativa       DateTime?
+  proximaTentativa      DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([nfeConfigId])
+  @@index([invoiceId])
+  @@index([status])
+  @@map("nfe_records")
 }

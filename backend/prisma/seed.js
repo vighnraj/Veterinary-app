@@ -243,7 +243,7 @@ async function main() {
   ]);
   console.log(`Created ${equineBreeds.length} equine breeds`);
 
-  // Create Test Account and User
+  // Create Test Account and Users for all roles
   const hashedPassword = await bcrypt.hash('Test@123', 12);
   const trialEndsAt = new Date();
   trialEndsAt.setDate(trialEndsAt.getDate() + 14);
@@ -260,20 +260,73 @@ async function main() {
     },
   });
 
-  const testUser = await prisma.user.upsert({
-    where: { email: 'test@vetsaas.com' },
-    update: {},
-    create: {
-      accountId: testAccount.id,
-      email: 'test@vetsaas.com',
-      password: hashedPassword,
-      firstName: 'Test',
-      lastName: 'User',
-      role: 'owner',
-      emailVerified: true,
-    },
-  });
-  console.log('Created test user: test@vetsaas.com / Test@123');
+  // Create users with different roles
+  const testUsers = await Promise.all([
+    // Owner
+    prisma.user.upsert({
+      where: { email: 'owner@vetsaas.com' },
+      update: {},
+      create: {
+        accountId: testAccount.id,
+        email: 'owner@vetsaas.com',
+        password: hashedPassword,
+        firstName: 'Owner',
+        lastName: 'User',
+        role: 'owner',
+        emailVerified: true,
+      },
+    }),
+    // Admin
+    prisma.user.upsert({
+      where: { email: 'admin@vetsaas.com' },
+      update: {},
+      create: {
+        accountId: testAccount.id,
+        email: 'admin@vetsaas.com',
+        password: hashedPassword,
+        firstName: 'Admin',
+        lastName: 'User',
+        role: 'admin',
+        emailVerified: true,
+      },
+    }),
+    // User
+    prisma.user.upsert({
+      where: { email: 'user@vetsaas.com' },
+      update: {},
+      create: {
+        accountId: testAccount.id,
+        email: 'user@vetsaas.com',
+        password: hashedPassword,
+        firstName: 'Regular',
+        lastName: 'User',
+        role: 'user',
+        emailVerified: true,
+      },
+    }),
+    // Viewer
+    prisma.user.upsert({
+      where: { email: 'viewer@vetsaas.com' },
+      update: {},
+      create: {
+        accountId: testAccount.id,
+        email: 'viewer@vetsaas.com',
+        password: hashedPassword,
+        firstName: 'Viewer',
+        lastName: 'User',
+        role: 'viewer',
+        emailVerified: true,
+      },
+    }),
+  ]);
+
+  console.log('\n=== TEST USERS CREATED ===');
+  console.log('Password for all: Test@123\n');
+  console.log('1. owner@vetsaas.com  - Role: OWNER (full access)');
+  console.log('2. admin@vetsaas.com  - Role: ADMIN (full access)');
+  console.log('3. user@vetsaas.com   - Role: USER (standard access)');
+  console.log('4. viewer@vetsaas.com - Role: VIEWER (read-only)');
+  console.log('==========================\n');
 
   console.log('Seeding completed!');
 }

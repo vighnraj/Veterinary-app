@@ -11,6 +11,11 @@ const subscriptionRoutes = require('./subscriptionRoutes');
 const dashboardRoutes = require('./dashboardRoutes');
 const notificationRoutes = require('./notificationRoutes');
 const reportRoutes = require('./reportRoutes');
+const nfeRoutes = require('./nfe');
+const batchRoutes = require('./batchRoutes');
+const serviceRoutes = require('./serviceRoutes');
+const teamRoutes = require('./teamRoutes');
+const profileRoutes = require('./profileRoutes');
 
 const router = express.Router();
 
@@ -35,5 +40,10 @@ router.use('/subscription', subscriptionRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/reports', reportRoutes);
+router.use('/nfe', nfeRoutes);
+router.use('/batches', batchRoutes);
+router.use('/services', serviceRoutes);
+router.use('/team', teamRoutes);
+router.use('/profile', profileRoutes);
 
 module.exports = router;

@@ -34,22 +34,38 @@ const useAuthStore = create((set, get) => ({
 
   // Login
   login: async (email, password) => {
-    const response = await authApi.login({ email, password });
-    const { user, account, tokens } = response.data;
+    try {
+      // Clear any existing tokens before login
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.USER);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.ACCOUNT);
 
-    // Store tokens and user data
-    await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken);
-    await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken);
-    await SecureStore.setItemAsync(STORAGE_KEYS.USER, JSON.stringify(user));
-    await SecureStore.setItemAsync(STORAGE_KEYS.ACCOUNT, JSON.stringify(account));
+      console.log('Attempting login for:', email);
+      const response = await authApi.login({ email, password });
+      console.log('Login response:', JSON.stringify(response, null, 2));
 
-    set({
-      user,
-      account,
-      isAuthenticated: true,
-    });
+      // authApi already returns response.data, so response = { success: true, data: { user, account, tokens } }
+      const { user, account, tokens } = response.data;
 
-    return response;
+      // Store tokens and user data
+      await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken);
+      await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken);
+      await SecureStore.setItemAsync(STORAGE_KEYS.USER, JSON.stringify(user));
+      await SecureStore.setItemAsync(STORAGE_KEYS.ACCOUNT, JSON.stringify(account));
+
+      set({
+        user,
+        account,
+        isAuthenticated: true,
+      });
+
+      return response;
+    } catch (error) {
+      console.error('Login error:', error.message);
+      console.error('Error response:', error.response?.data);
+      throw error;
+    }
   },
 
   // Register

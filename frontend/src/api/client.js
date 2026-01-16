@@ -2,6 +2,8 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { API_URL, STORAGE_KEYS } from '../constants/config';
 
+console.log('API Client initialized with URL:', API_URL);
+
 const apiClient = axios.create({
   baseURL: API_URL,
   timeout: 30000,
@@ -34,8 +36,13 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If 401 and not already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Skip refresh for auth endpoints to prevent loops
+    const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/register') ||
+      originalRequest.url?.includes('/auth/refresh-token');
+
+    // If 401 and not already retried and not auth endpoint
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       try {
@@ -46,6 +53,7 @@ apiClient.interceptors.response.use(
             refreshToken,
           });
 
+          // axios response.data = { success: true, data: { tokens: {...} } }
           const { accessToken, refreshToken: newRefreshToken } = response.data.data.tokens;
 
           await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);

@@ -49,8 +49,8 @@ const Notifications = () => {
     onError: (err) => setError(getErrorMessage(err)),
   });
 
-  const notifications = data?.data || [];
-  const pagination = data?.pagination;
+  const notifications = data?.data?.notifications || [];
+  const pagination = data?.data?.pagination;
 
   const getNotificationIcon = (type) => {
     // Could customize based on type

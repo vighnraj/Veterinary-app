@@ -12,64 +12,87 @@ import {
   FiBell,
   FiCreditCard,
   FiX,
+  FiUserPlus,
 } from 'react-icons/fi';
 import { ROUTES } from '../../constants/routes';
 import { useAuth } from '../../hooks/useAuth';
 
+// roles: which roles can see this menu item
+// empty array = all roles can see
 const menuItems = [
   {
     title: 'Principal',
     items: [
-      { path: ROUTES.DASHBOARD, icon: FiHome, label: 'Dashboard' },
+      { path: ROUTES.DASHBOARD, icon: FiHome, label: 'Dashboard', roles: [] },
     ],
   },
   {
     title: 'Cadastros',
     items: [
-      { path: ROUTES.CLIENTS, icon: FiUsers, label: 'Clientes' },
-      { path: ROUTES.ANIMALS, icon: FiBox, label: 'Animais' },
-      { path: ROUTES.BATCHES, icon: FiBox, label: 'Lotes' },
+      { path: ROUTES.CLIENTS, icon: FiUsers, label: 'Clientes', roles: ['owner', 'admin', 'user'] },
+      { path: ROUTES.ANIMALS, icon: FiBox, label: 'Animais', roles: ['owner', 'admin', 'user'] },
+      { path: ROUTES.BATCHES, icon: FiBox, label: 'Lotes', roles: ['owner', 'admin', 'user'] },
     ],
   },
   {
     title: 'Atendimentos',
     items: [
-      { path: ROUTES.APPOINTMENTS, icon: FiCalendar, label: 'Agendamentos' },
-      { path: ROUTES.SERVICES, icon: FiFileText, label: 'Servi\u00e7os' },
+      { path: ROUTES.APPOINTMENTS, icon: FiCalendar, label: 'Agendamentos', roles: ['owner', 'admin', 'user'] },
+      { path: ROUTES.SERVICES, icon: FiFileText, label: 'Serviços', roles: ['owner', 'admin'] },
     ],
   },
   {
     title: 'Manejo',
     items: [
-      { path: ROUTES.REPRODUCTIVE, icon: FiHeart, label: 'Reprodutivo' },
-      { path: ROUTES.SANITARY, icon: FiShield, label: 'Sanit\u00e1rio' },
+      { path: ROUTES.REPRODUCTIVE, icon: FiHeart, label: 'Reprodutivo', roles: ['owner', 'admin', 'user'] },
+      { path: ROUTES.SANITARY, icon: FiShield, label: 'Sanitário', roles: ['owner', 'admin', 'user'] },
     ],
   },
   {
     title: 'Financeiro',
     items: [
-      { path: ROUTES.FINANCIAL, icon: FiDollarSign, label: 'Financeiro' },
-      { path: ROUTES.INVOICES, icon: FiFileText, label: 'Faturas' },
+      { path: ROUTES.FINANCIAL, icon: FiDollarSign, label: 'Financeiro', roles: ['owner', 'admin'] },
+      { path: ROUTES.INVOICES, icon: FiFileText, label: 'Faturas', roles: ['owner', 'admin'] },
     ],
   },
   {
     title: 'Outros',
     items: [
-      { path: ROUTES.REPORTS, icon: FiFileText, label: 'Relat\u00f3rios' },
-      { path: ROUTES.NOTIFICATIONS, icon: FiBell, label: 'Notifica\u00e7\u00f5es' },
-      { path: ROUTES.SUBSCRIPTION, icon: FiCreditCard, label: 'Assinatura' },
-      { path: ROUTES.PROFILE, icon: FiSettings, label: 'Configura\u00e7\u00f5es' },
+      { path: ROUTES.REPORTS, icon: FiFileText, label: 'Relatórios', roles: ['owner', 'admin'] },
+      { path: ROUTES.NOTIFICATIONS, icon: FiBell, label: 'Notificações', roles: [] },
+      { path: ROUTES.SUBSCRIPTION, icon: FiCreditCard, label: 'Assinatura', roles: ['owner'] },
+      { path: ROUTES.PROFILE, icon: FiSettings, label: 'Configurações', roles: [] },
+    ],
+  },
+  {
+    title: 'Administração',
+    roles: ['owner', 'admin'], // section only visible to these roles
+    items: [
+      { path: ROUTES.USERS, icon: FiUserPlus, label: 'Usuários', roles: ['owner', 'admin'] },
     ],
   },
 ];
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
-  const { account } = useAuth();
+  const { account, user } = useAuth();
+  const userRole = user?.role || 'viewer';
 
   const isActiveLink = (path) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
+  };
+
+  // Check if user can see a menu item
+  const canSeeItem = (item) => {
+    if (!item.roles || item.roles.length === 0) return true;
+    return item.roles.includes(userRole);
+  };
+
+  // Check if user can see a section
+  const canSeeSection = (section) => {
+    if (section.roles && !section.roles.includes(userRole)) return false;
+    return section.items.some(canSeeItem);
   };
 
   return (
@@ -95,11 +118,11 @@ const Sidebar = ({ isOpen, onClose }) => {
 
         <div className="sidebar-body">
           <nav className="sidebar-nav">
-            {menuItems.map((section) => (
+            {menuItems.filter(canSeeSection).map((section) => (
               <div key={section.title} className="sidebar-section">
                 <h6 className="sidebar-section-title">{section.title}</h6>
                 <ul className="nav flex-column">
-                  {section.items.map((item) => (
+                  {section.items.filter(canSeeItem).map((item) => (
                     <li key={item.path} className="nav-item">
                       <NavLink
                         to={item.path}

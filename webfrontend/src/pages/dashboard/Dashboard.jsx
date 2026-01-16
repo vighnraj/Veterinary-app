@@ -31,11 +31,20 @@ const Dashboard = () => {
     select: (res) => res.data.data,
   });
 
-  const { data: alerts, isLoading: loadingAlerts } = useQuery({
+  const { data: alertsData, isLoading: loadingAlerts } = useQuery({
     queryKey: [QUERY_KEYS.ALERTS],
     queryFn: () => dashboardApi.getAlerts(),
     select: (res) => res.data.data,
   });
+
+  // Flatten alerts from categorized object to array
+  const alerts = alertsData
+    ? [
+        ...(alertsData.vaccinations || []).map((a) => ({ ...a, type: 'vaccine_due', title: a.title, message: `${a.animal} - ${a.client}`, dueDate: a.date })),
+        ...(alertsData.reproductive || []).map((a) => ({ ...a, type: 'pregnancy_check', title: a.title, message: `${a.animal} - ${a.client}`, dueDate: a.date })),
+        ...(alertsData.financial || []).map((a) => ({ ...a, type: 'payment_due', title: a.title, message: a.client, dueDate: a.date })),
+      ]
+    : [];
 
   if (loadingOverview) {
     return <Loading fullScreen />;

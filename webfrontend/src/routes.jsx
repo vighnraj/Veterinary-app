@@ -5,6 +5,9 @@ import { ROUTES } from './constants/routes';
 import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
+// Landing Page
+import LandingPage from './pages/landing/LandingPage';
+
 // Auth Pages
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -45,6 +48,12 @@ import Users from './pages/settings/Users';
 import NotFound from './pages/NotFound';
 
 const router = createBrowserRouter([
+  // Landing page (public)
+  {
+    path: '/home',
+    element: <LandingPage />,
+  },
+
   // Auth routes (public)
   {
     path: ROUTES.LOGIN,

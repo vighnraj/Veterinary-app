@@ -36,8 +36,16 @@ const useAuthStore = create((set, get) => ({
 
   // Login
   login: async (email, password) => {
+    // Clear any existing tokens before login to prevent race conditions
+    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(STORAGE_KEYS.ACCOUNT);
+
     const response = await authApi.login({ email, password });
-    const { user, account, accessToken, refreshToken } = response.data.data;
+    // Backend returns tokens inside a 'tokens' object
+    const { user, account, tokens } = response.data.data;
+    const { accessToken, refreshToken } = tokens;
 
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);

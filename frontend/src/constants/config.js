@@ -1,4 +1,22 @@
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+import { Platform } from 'react-native';
+
+// For different platforms:
+// - Android Emulator: 10.0.2.2 maps to localhost
+// - iOS Simulator: localhost works
+// - Web: localhost works
+// - Physical Device: use computer's IP address in .env file
+const getDefaultApiUrl = () => {
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:3000/api/v1';
+  }
+  // iOS, Web, and others use localhost
+  return 'http://localhost:3000/api/v1';
+};
+
+// Use env variable if set, otherwise detect based on platform
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || getDefaultApiUrl();
+
+console.log('Platform:', Platform.OS, '| API URL:', API_URL);
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'access_token',
